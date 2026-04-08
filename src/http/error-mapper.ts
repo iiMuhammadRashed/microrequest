@@ -11,6 +11,48 @@ export interface RequestErrorMeta {
   upstreamBody?: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stringifyMessage(message: unknown): string | undefined {
+  if (typeof message === 'string') {
+    return message;
+  }
+  if (Array.isArray(message)) {
+    const parts = message.filter((item): item is string => typeof item === 'string');
+    return parts.length > 0 ? parts.join(', ') : undefined;
+  }
+  return undefined;
+}
+
+function normalizeUpstream4xxBody(
+  statusCode: number,
+  body: unknown
+): Record<string, unknown> {
+  if (isRecord(body)) {
+    return {
+      statusCode:
+        typeof body.statusCode === 'number' ? body.statusCode : statusCode,
+      ...body,
+    };
+  }
+
+  if (typeof body === 'string' && body.trim().length > 0) {
+    return {
+      statusCode,
+      message: body,
+      error: 'Upstream Error',
+    };
+  }
+
+  return {
+    statusCode,
+    message: `HTTP ${statusCode}`,
+    error: 'Upstream Error',
+  };
+}
+
 /**
  * Try to get NestJS exceptions, fall back to Error subclasses if not available
  */
@@ -68,43 +110,39 @@ export function mapTransportError(
  */
 export function mapUpstreamError(
   statusCode: number,
-  body: string | undefined,
+  body: unknown,
   meta: RequestErrorMeta
 ): Error {
   const nest = getNestJsException();
 
   // 4xx errors: pass through as-is
   if (statusCode < 500) {
+    const responseBody = normalizeUpstream4xxBody(statusCode, body);
+    const bodyMessage = stringifyMessage(responseBody.message);
     const message = formatErrorMessage(
       `HTTP ${statusCode}`,
       statusCode,
       meta,
-      body
+      bodyMessage
     );
 
     if (nest) {
-      return new nest.HttpException(message, statusCode);
+      return new nest.HttpException(responseBody, statusCode);
     }
 
     const err = new Error(message) as any;
     err.statusCode = statusCode;
-    err.response = {
-      statusCode,
-      message,
-      error: 'Upstream Error',
-    };
-    if (body) {
-      err.response.body = body;
-    }
+    err.response = responseBody;
     return err;
   }
 
   // 5xx errors: normalize to 502 Bad Gateway
+  const bodyText = typeof body === 'string' ? body : undefined;
   const message = formatErrorMessage(
     `Upstream error (${statusCode})`,
     502,
     meta,
-    body
+    bodyText
   );
 
   if (nest) {
@@ -119,8 +157,8 @@ export function mapUpstreamError(
     error: 'Bad Gateway',
     upstreamStatus: statusCode,
   };
-  if (body) {
-    err.response.upstreamBody = truncateBody(body);
+  if (bodyText) {
+    err.response.upstreamBody = truncateBody(bodyText);
   }
   return err;
 }

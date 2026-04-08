@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-04-08
+
+### 🐛 Fixed
+
+- Fixed upstream `4xx` NestJS exception pass-through detection so already-mapped errors are no longer wrapped as transport `502`.
+- Fixed duplicate-user style conflict flow to preserve upstream `409` payload/message instead of returning wrapped `Bad Gateway` output.
+- Fixed upstream error mapping to preserve structured JSON body fields (`message`, `error`, `statusCode`) for `4xx` responses.
+- Improved retry status extraction by supporting `statusCode`, `response.statusCode`, and Nest `getStatus()` error shapes.
+
 ## [0.1.2] - 2026-04-08
 
 ### ✨ Improved

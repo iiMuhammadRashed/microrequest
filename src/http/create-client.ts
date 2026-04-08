@@ -40,6 +40,34 @@ interface RequestResult {
 }
 
 /**
+ * Best-effort status code extraction from mixed error shapes.
+ */
+function getErrorStatusCode(err: unknown): number | undefined {
+  if (!err || typeof err !== 'object') {
+    return undefined;
+  }
+
+  const maybeError = err as any;
+
+  if (typeof maybeError.statusCode === 'number') {
+    return maybeError.statusCode;
+  }
+
+  if (typeof maybeError.response?.statusCode === 'number') {
+    return maybeError.response.statusCode;
+  }
+
+  if (typeof maybeError.getStatus === 'function') {
+    const status = maybeError.getStatus();
+    if (typeof status === 'number') {
+      return status;
+    }
+  }
+
+  return undefined;
+}
+
+/**
  * Create an HTTP client for service-to-service communication
  *
  * Features:
@@ -188,8 +216,7 @@ export function createClient(options: HttpClientOptions): HttpClient {
 
         // Check for non-2xx status
         if (statusCode < 200 || statusCode >= 300) {
-          const bodyStr = typeof body === 'string' ? body : undefined;
-          throw mapUpstreamError(statusCode, bodyStr, {
+          throw mapUpstreamError(statusCode, body, {
             ...payload,
             upstreamStatus: statusCode,
           });
@@ -204,7 +231,7 @@ export function createClient(options: HttpClientOptions): HttpClient {
       payload.durationMs = durationMs;
 
       // Upstream/transport errors already mapped in this client should pass through unchanged.
-      const mappedStatus = (err as any)?.response?.statusCode;
+      const mappedStatus = getErrorStatusCode(err);
       if (typeof mappedStatus === 'number') {
         throw err;
       }
@@ -287,7 +314,7 @@ export function createClient(options: HttpClientOptions): HttpClient {
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         const durationMs = performance.now() - startTime;
-        const statusCode = (err as any)?.response?.statusCode;
+        const statusCode = getErrorStatusCode(err);
 
         // Check if we should retry
         if (
