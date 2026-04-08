@@ -1,6 +1,6 @@
 {
   "name": "micro-requester",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Production-ready TypeScript package for standardized service-to-service HTTP calls in NestJS microservices",
   "license": "MIT",
   "author": "Muhammad Rashed <iimuhammad.rashed@gmail.com>",
