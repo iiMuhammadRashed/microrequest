@@ -69,6 +69,24 @@ bun add micro-requester
 
 ## Quick Start
 
+### Zero Boilerplate (Recommended)
+
+```typescript
+import { createAutoClient, requestContextMiddleware } from 'micro-requester';
+
+// one line in bootstrap/main
+app.use(requestContextMiddleware);
+
+const users = createAutoClient({
+  service: 'users-service',
+  base: process.env.USERS_SERVICE_HTTP_URL || 'http://localhost:3001',
+});
+
+const created = await users.post('/users', { body: { email: 'a@b.com', name: 'Alice' } });
+```
+
+You no longer need to create a custom request-context middleware file or wire `getReqId` manually.
+
 ### Basic Usage
 
 ```typescript
@@ -117,15 +135,13 @@ try {
 
 ```typescript
 import { Injectable } from '@nestjs/common';
-import { createClient } from 'micro-requester';
-import { requestContext } from './request-context.middleware';
+import { createAutoClient } from 'micro-requester';
 
 @Injectable()
 export class UsersClient {
-  private client = createClient({
+  private client = createAutoClient({
     service: 'users',
     base: process.env.USERS_API_URL!,
-    getReqId: () => requestContext.getStore()?.requestId,
   });
 
   getUser(id: string) {
